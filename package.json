@@ -1,0 +1,21 @@
+{
+  "name": "sendable-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot that crowdsources Colorado trail/peak conditions and answers 'is it sendable?' with a self-healing feedback loop.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node src/register-commands.js",
+    "migrate": "node src/db.js --migrate"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "better-sqlite3": "^11.5.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
