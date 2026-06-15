@@ -6,11 +6,13 @@
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Railway provides a persistent volume mount; default to local file otherwise.
 const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'sendable.db');
 
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
