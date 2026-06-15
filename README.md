@@ -18,26 +18,44 @@ It runs the same multi-source conditions workflow we built as the `co-mountain-b
 
 ---
 
-## What it does
+## Commands
 
 ```
 /sendable route:"Quandary Peak" date:"this Saturday"
 ```
+→ posts a conditions embed (below).
 
-→ posts an embed:
+```
+/defineroute name:"Yale 360" strava:<url> alltrails:<url> description:"30km loop, not the standard out-and-back"
+```
+→ teaches the bot a specific route so it stops confusing it with the standard route on the same peak. All args except `name` are optional; the bot researches and stores the distinguishing terrain, then matches future `/sendable` queries against it.
+
+```
+/routes
+```
+→ lists the custom routes the bot has learned.
+
+### The `/sendable` embed
 
 ```
 ✅ Quandary Peak — SENDABLE
-[2-3 sentence verdict]
+[2-3 sentence verdict, framed as conditions not safety clearance]
+🕐 Data recency:  most recent on-route report: … (N days ago)
+⚠️ Hazards:  avalanche / cornices / postholing / lightning …
 ❄️ Snowpack:  …
-📋 Trip reports:  …
+📋 Trip reports:  … (flagged ON_ROUTE or WRONG_ROUTE)
 🥾 AllTrails:  …
 🌤️ Weather (Sat):  … + turnaround time
 📅 Day pick:  …
+🛟 This is not a safety clearance:  … check CAIC, verify yourself
 🔗 Sources: [1][2][3]
-Confidence 78% · 👍 0 👎 0 · react to train me
+Confidence 78% · 👍 0 👎 0 · vote + report conditions to tune me
 [👍] [👎] [Report actual conditions]
 ```
+
+### Route precision
+
+The bot distinguishes *which* route on a peak you mean. A query with a qualifier like `360`, `loop`, `traverse`, `ridge`, `couloir`, or `linkup` (or any route saved via `/defineroute`) will not be answered with standard out-and-back conditions. Reports are tagged ON_ROUTE / PARTIAL / WRONG_ROUTE, and a "perfect conditions" report for the wrong route is demoted to labeled proxy data rather than driving the verdict. When only standard-route data exists, the embed says so and infers for the actual route.
 
 ---
 
@@ -47,7 +65,7 @@ Three signals feed back into the model, in increasing order of strength:
 
 1. **👍 / 👎 votes** — gently nudge `source_weights` (how much to trust SNOTEL vs 14ers vs AllTrails vs weather). A downvoted call slightly distrusts the sources that drove it; an upvoted call reinforces them.
 
-2. **"Report actual conditions" modal** — the strongest signal. A user who actually went says what it *really* was (sendable / marginal / not yet) + notes. This moves a **per-route bias** term: if the bot over-promised on a route that holds snow late (think Kit Carson Avenue), that route gets a learned conservative bias so future calls account for it.
+2. **"Report actual conditions" modal** — the strongest signal. A user who actually went says what it *really* was (sendable / marginal / not yet), when, and a free-form note of what they found. This does two things: (a) moves a **per-route bias** term so a route that holds snow late (think Kit Carson Avenue) gets a learned conservative adjustment, and (b) the free-form note is **stored and injected directly into the prompt** the next time anyone asks about that route — labeled as high-value, on-the-ground ground truth weighted above generic web sources. So if someone writes "creek at mile 4 was thigh-deep," the next person asking sees that reflected.
 
 3. **Systematic over-promising** (e.g. repeatedly saying SENDABLE when reality was NOT_YET on runs) nudges the global **verdict thresholds** tighter.
 
@@ -99,10 +117,11 @@ Railway auto-builds via Nixpacks (`railway.json`). The bot is a long-running pro
 
 | File | Role |
 |---|---|
-| `src/index.js` | Discord bot: `/sendable`, buttons, modal, schedules tuner |
-| `src/beta-engine.js` | Calls Claude w/ web_search; injects learned weights/thresholds/bias; returns structured verdict |
+| `src/index.js` | Discord bot: `/sendable`, `/defineroute`, `/routes`, buttons, modal, schedules tuner |
+| `src/beta-engine.js` | Calls Claude w/ web_search; route-aware; injects weights/thresholds/bias + community field notes; returns structured verdict |
+| `src/route-builder.js` | Builds a structured route definition from a Strava/AllTrails link + description (`/defineroute`) |
 | `src/tuner.js` | The self-healing loop: feedback → weight/threshold/bias updates |
-| `src/db.js` | SQLite schema + accessors |
+| `src/db.js` | SQLite schema + accessors (queries, feedback, corrections, routes, learned params) |
 | `src/register-commands.js` | One-time slash command registration |
 
 ---
