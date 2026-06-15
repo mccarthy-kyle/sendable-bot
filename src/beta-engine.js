@@ -152,22 +152,43 @@ ${formatted}`;
   }
 
   const system = buildSystemPrompt({ weights, runThresh, peakThresh, routeBias, routeName, routeContext })
-    + communityBlock;
+    + communityBlock
+    + `\n\nOUTPUT DISCIPLINE: You may use tools and think across turns, but your FINAL message must be ONLY the JSON object — no preamble, no commentary, no markdown fences. Nothing before the "{" or after the "}".`;
   const userMsg = `Route: ${routeName}\nTarget date: ${targetDate || 'not specified — give current conditions and note that'}`;
 
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 2000,
+    max_tokens: 4096,
     system,
     tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 12 }],
     messages: [{ role: 'user', content: userMsg }],
   });
 
+  // The final answer JSON is in the LAST text block (after all tool turns). Try
+  // that first, then fall back to scanning all text, so interim commentary in
+  // earlier blocks doesn't break parsing.
   const textBlocks = response.content.filter(b => b.type === 'text').map(b => b.text);
-  const fullText = textBlocks.join('\n').trim();
-  const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Could not parse beta response: ' + fullText.slice(0, 200));
-  const parsed = JSON.parse(jsonMatch[0]);
+  let parsed = null;
+  for (let i = textBlocks.length - 1; i >= 0 && !parsed; i--) {
+    const m = textBlocks[i].match(/\{[\s\S]*\}/);
+    if (m) { try { parsed = JSON.parse(m[0]); } catch { /* keep looking */ } }
+  }
+  if (!parsed) {
+    // Graceful degradation: don't crash the command. Return a readable MARGINAL
+    // with whatever the model did say, so the user gets something useful.
+    const note = textBlocks.join(' ').replace(/\s+/g, ' ').trim().slice(0, 600)
+      || 'The conditions service returned an incomplete response.';
+    parsed = {
+      verdict: 'MARGINAL',
+      confidence: 0.3,
+      route_match: 'incomplete response',
+      summary: `⚠️ I couldn't fully compile the report for this one. Here's what I gathered: ${note} — re-run /sendable to try again.`,
+      data_age: 'unknown — incomplete response',
+      hazards: 'Verify avalanche (CAIC), snow, exposure, and weather yourself before committing.',
+      snotel: '—', trip_reports: '—', alltrails: '—', weather: '—', day_recommendation: '—',
+      sources: [],
+    };
+  }
 
   const citedUrls = [];
   for (const block of response.content) {
