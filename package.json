@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/index.js",
     "register": "node src/register-commands.js",
-    "migrate": "node src/db.js --migrate"
+    "migrate": "node src/db.js --migrate",
+    "seed:cotrex": "node src/seed-cotrex.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -16,6 +17,6 @@
     "dotenv": "^16.4.5"
   },
   "engines": {
-    "node": "20.x"
+    "node": ">=20.0.0"
   }
 }

@@ -113,9 +113,23 @@ Railway auto-builds via Nixpacks (`railway.json`). The bot is a long-running pro
 
 ---
 
-## Files
+## Bulk-loading routes from COTREX
 
-| File | Role |
+The bot can seed its route library from **COTREX** (Colorado Trail Explorer), the state's official open-data trail layer — no scraping, no login, ~40,000 miles of mapped trails.
+
+```bash
+npm run seed:cotrex
+```
+
+This pulls every named, maintained Colorado trail with reliable metadata (name, length, use type/manager) and stores it in the `routes` table, marked `source: cotrex`. Re-runnable — it skips trails already stored, so running it again only adds new ones.
+
+**What COTREX is good for:** the maintained, named-trail backbone (CT segments, approach trails, named trails). **What it doesn't contain:** off-trail peak linkups or informal route names (e.g. "Yale 360", "Nolan's"). COTREX maps trail *segments*, not curated *routes* — so those still come from `/defineroute`, which enriches them with 14ers.com/AllTrails research. COTREX entries are flagged as needing route-level enrichment.
+
+To point at a different COTREX mirror if the public endpoint changes, set `COTREX_URL` to a `.../FeatureServer/<id>` layer.
+
+---
+
+
 |---|---|
 | `src/index.js` | Discord bot: `/sendable`, `/defineroute`, `/routes`, buttons, modal, schedules tuner |
 | `src/beta-engine.js` | Calls Claude w/ web_search; route-aware; injects weights/thresholds/bias + community field notes; returns structured verdict |
@@ -123,6 +137,7 @@ Railway auto-builds via Nixpacks (`railway.json`). The bot is a long-running pro
 | `src/tuner.js` | The self-healing loop: feedback → weight/threshold/bias updates |
 | `src/db.js` | SQLite schema + accessors (queries, feedback, corrections, routes, learned params) |
 | `src/register-commands.js` | One-time slash command registration |
+| `src/seed-cotrex.js` | Bulk-imports Colorado trails from the COTREX open-data API into the routes table (re-runnable) |
 
 ---
 
