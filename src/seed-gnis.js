@@ -49,6 +49,14 @@ function ingest(text) {
   const elevMCol = col(['elev_in_m', 'elevation_m']);
   const elevFtCol = col(['elev_in_ft', 'elevation_ft']);
 
+  // Newer GNIS DomesticNames files DROPPED elevation columns. If elevation is
+  // absent, we can't filter by height — instead we keep summits that fall inside
+  // a known Colorado mountain-range bounding box (alpine by location).
+  const hasElev = Boolean(elevMCol || elevFtCol);
+  if (!hasElev) {
+    console.log('No elevation column in this GNIS file — filtering summits by mountain-region bounding box instead.');
+  }
+
   const exists = db.prepare(`SELECT id FROM peaks WHERE LOWER(name) = ?`);
   const insert = db.prepare(`
     INSERT INTO peaks (name, lat, lon, elevation_m, prominence_m, region, source, created_at)
@@ -65,21 +73,33 @@ function ingest(text) {
       if (!name) continue;
       const lat = parseFloat(row[latCol]);
       const lon = parseFloat(row[lonCol]);
+
       let elevM = elevMCol ? parseFloat(row[elevMCol]) : NaN;
       if (isNaN(elevM) && elevFtCol) {
         const ft = parseFloat(row[elevFtCol]);
         if (!isNaN(ft)) elevM = ft * 0.3048;
       }
-      if (isNaN(elevM) || elevM < MIN_ELEV_M) continue; // alpine only
+
+      const region = (!isNaN(lat) && !isNaN(lon)) ? regionForLatLon(lat, lon) : null;
+
+      // Keep logic:
+      //  - if we have elevation: alpine cutoff (>= MIN_ELEV_M)
+      //  - if no elevation: keep only summits inside a known mountain region bbox
+      if (hasElev) {
+        if (isNaN(elevM) || elevM < MIN_ELEV_M) continue;
+      } else {
+        if (!region) continue; // outside all mountain ranges -> skip (drops plains/urban summits)
+      }
+
       if (exists.get(normalizeRoute(name))) continue;
 
       insert.run({
         name,
         lat: isNaN(lat) ? null : lat,
         lon: isNaN(lon) ? null : lon,
-        elevation_m: Math.round(elevM),
-        prominence_m: null, // GNIS doesn't carry prominence
-        region: (!isNaN(lat) && !isNaN(lon)) ? regionForLatLon(lat, lon) : null,
+        elevation_m: isNaN(elevM) ? null : Math.round(elevM),
+        prominence_m: null,
+        region,
         source: 'gnis',
         created_at: Date.now(),
       });
