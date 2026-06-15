@@ -9,7 +9,7 @@
     "register": "node src/register-commands.js",
     "migrate": "node src/db.js --migrate",
     "seed:cotrex": "node src/seed-cotrex.js",
-    "seed:peakbagger": "node src/seed-peakbagger.js",
+    "seed:gnis": "node src/seed-gnis.js",
     "seed:json": "node src/seed-json.js"
   },
   "dependencies": {

@@ -118,18 +118,22 @@ Railway auto-builds via Nixpacks (`railway.json`). The bot is a long-running pro
 The bot can seed its route library from **COTREX** (Colorado Trail Explorer), the state's official open-data trail layer — no scraping, no login, ~40,000 miles of mapped trails.
 
 ```bash
-npm run seed:cotrex
+npm run seed:cotrex                       # whole state (~40k trails, noisy)
+npm run seed:cotrex -- --region=sawatch   # one alpine range (recommended)
+npm run seed:cotrex -- --regions=sawatch,sangre,san_juan,elk,mosquito,front
 ```
 
-This pulls every named, maintained Colorado trail with reliable metadata (name, length, use type/manager) and stores it in the `routes` table, marked `source: cotrex`. Re-runnable — it skips trails already stored.
+This pulls maintained Colorado trails with reliable metadata (name, length, use type/manager) into the `routes` table, marked `source: cotrex` and tagged with their region. Re-runnable — skips trails already stored.
+
+**Region filtering (recommended).** Statewide pulls ~40k trails including every urban greenway. Passing `--region` or `--regions` filters server-side via an ArcGIS spatial bounding-box query (the range boxes in `co-regions.js`), so you only pull trails in the alpine ranges you care about. For your use, `--regions=sawatch,sangre,san_juan,elk,mosquito,front` gives the alpine backbone without the city-path noise.
 
 **What COTREX is good for:** the maintained, named-trail backbone (CT segments, approach trails). **What it doesn't contain:** off-trail peak linkups or informal route names (e.g. "Yale 360", "Nolan's") — those come from `/defineroute`.
 
 To point at a different COTREX mirror if the endpoint changes, set `COTREX_URL` to a `.../FeatureServer/<id>` layer.
 
-### The 40k-trails noise problem — handled at query time
+### Belt-and-suspenders: query-time filtering too
 
-COTREX dumps the whole state in, including urban greenways. Rather than filtering at import, the bot filters when it *matches* a route: `findRoute` ranks candidates by name match first, then prefers enriched/user/peakbagger routes over raw COTREX rows, then higher elevation (>~11,500 ft) and known alpine regions (Sawatch, Sangres, San Juans, etc.). So a query for an alpine route won't get hijacked by a same-named city path. `/routes` also lists enriched routes before raw COTREX trails.
+Even with region filtering at import, `findRoute` also ranks at match time: name match first, then enriched/user routes over raw COTREX rows, then higher elevation and alpine regions. So a query won't get hijacked by a same-named city path, and `/routes` lists enriched routes before raw COTREX trails.
 
 ## Seeding your own routes (Strava + curated JSON)
 
@@ -145,14 +149,20 @@ This is a generic JSON importer — any file that's an array of route objects (`
 
 ---
 
-## Bulk-loading peaks from Peakbagger
+## Bulk-loading peaks from USGS GNIS
 
 ```bash
-npm run seed:peakbagger -- --range=10000-10050
-npm run seed:peakbagger -- --ids=1234,5678
+# download DomesticNames_Colorado.txt from the USGS National Map, drop in seeds/, then:
+npm run seed:gnis seeds/DomesticNames_Colorado.txt
+# or, where outbound network is allowed:
+npm run seed:gnis -- --url=<direct-txt-url>
 ```
 
-A **polite, rate-limited** importer for Colorado peak coordinates/elevation/prominence into the `peaks` table. It is intentionally gentle — hard delay between requests (default 3s, set `PEAKBAGGER_DELAY_MS`), a per-run cap (default 50, set `PEAKBAGGER_MAX`), Colorado bounding-box filter, and dedupe by name. It is **not** a blind full-site crawler; be a good citizen and don't crank the limits. Peakbagger has no official API, so if they ever ask you to stop, stop.
+Imports Colorado **summits** from USGS GNIS — the official federal geographic-names database. It's **public domain** (U.S. Government work), purpose-built as a gazetteer, with no ToS restrictions. Filters to feature class `Summit`, keeps peaks above ~11,500 ft (`GNIS_MIN_ELEV_M`, default 3500m), tags each by mountain region from its coordinates, and dedupes by name. Gives you name + coordinates + elevation for every named Colorado summit.
+
+The Colorado file is `DomesticNames_Colorado.txt` (pipe-delimited) from The National Map Staged Products Directory → Geographic Names folder. GNIS doesn't carry prominence, so that field stays null.
+
+> We deliberately use GNIS instead of Peakbagger: Peakbagger's Terms of Service restrict its data to personal, non-commercial use and prohibit compiling/redistributing it, so it's not an appropriate source to seed a shared bot. GNIS is the right, openly-licensed equivalent.
 
 ---
 
@@ -165,7 +175,8 @@ A **polite, rate-limited** importer for Colorado peak coordinates/elevation/prom
 | `src/db.js` | SQLite schema + accessors (queries, feedback, corrections, routes, learned params) |
 | `src/register-commands.js` | One-time slash command registration |
 | `src/seed-cotrex.js` | Bulk-imports Colorado trails from the COTREX open-data API into the routes table (re-runnable) |
-| `src/seed-peakbagger.js` | Polite, rate-limited importer for Colorado peak coordinates/elevation into the peaks table |
+| `src/seed-gnis.js` | Imports Colorado summits from USGS GNIS (public-domain federal data) into the peaks table |
+| `src/co-regions.js` | Colorado mountain-range bounding boxes used for region tagging |
 | `src/seed-json.js` | Generic importer for a JSON array of routes (used for the curated Strava seed) |
 | `seeds/strava-routes.json` | Curated routes from your Strava run/hike history |
 

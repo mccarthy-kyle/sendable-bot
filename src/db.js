@@ -100,13 +100,13 @@ export function migrate() {
       lon REAL,
       elevation_m REAL,                       -- peak/high-point elevation if known
       region TEXT,                            -- 'sawatch','sangre','front','san_juan','elk','mosquito',...
-      source TEXT,                            -- 'strava:1234','alltrails:url','user','cotrex','peakbagger'
+      source TEXT,                            -- 'strava:1234','alltrails:url','user','cotrex'
       created_by TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_routes_name ON routes(canonical_name);
 
-    -- Peaks catalog (from Peakbagger / coordinate sources). Summits, not routes.
+    -- Peaks catalog (from USGS GNIS). Summits, not routes.
     CREATE TABLE IF NOT EXISTS peaks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -115,7 +115,7 @@ export function migrate() {
       elevation_m REAL,
       prominence_m REAL,
       region TEXT,
-      source TEXT,                            -- 'peakbagger:1234'
+      source TEXT,                            -- 'gnis'
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_peaks_name ON peaks(name);
@@ -243,7 +243,7 @@ export function saveRoute(r) {
 
 // Find a stored route by fuzzy-matching the query against canonical names + aliases.
 // QUERY-TIME FILTERING: when multiple trails match (the 40k COTREX problem), prefer
-// (1) higher name-match score, then (2) enriched/user/peakbagger routes over raw
+// (1) higher name-match score, then (2) enriched/user routes over raw
 // COTREX trail rows, then (3) higher elevation / known alpine regions. This keeps
 // urban greenways from outranking the alpine route the user actually means.
 const ALPINE_REGIONS = new Set(['sawatch', 'sangre', 'san_juan', 'elk', 'mosquito', 'front', 'tenmile', 'gore', 'needle']);
@@ -263,7 +263,7 @@ export function findRoute(query) {
   // Composite ranking: name match dominates, then enrichment, then alpine relevance.
   const score = ({ r, nameScore }) => {
     let s = nameScore * 100;
-    if (r.source && r.source !== 'cotrex') s += 15;           // enriched/user/peakbagger beats raw trail
+    if (r.source && r.source !== 'cotrex') s += 15;           // enriched/user route beats raw trail
     if (r.distinct_from_standard && !/needs enrichment/i.test(r.distinct_from_standard)) s += 10;
     if (r.elevation_m && r.elevation_m > 3500) s += 8;        // >~11,500 ft = alpine
     if (r.region && ALPINE_REGIONS.has(r.region)) s += 5;
