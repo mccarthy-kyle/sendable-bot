@@ -4,7 +4,7 @@ A Discord bot for trail-running communities that answers **"is it sendable?"** f
 
 ## ⚠️ Safety — read this before letting anyone rely on it
 
-**This bot is not a safety system and its verdicts are not clearance to go.** It reads incomplete public web data through an LLM and *will sometimes be wrong* — it can miss a recent storm, misread a report, or hallucinate. Built-in guardrails (conservative defaults, mandatory hazard callouts, data-age disclosure, auto-downgrade of low-confidence SENDABLE calls, and a "not a safety clearance" disclaimer on every result) reduce but **do not eliminate** that risk.
+**This bot is not a safety system and its verdicts are not clearance to go.** It reads incomplete public web data through an LLM and *will sometimes be wrong* — it can miss a recent storm, misread a report, or hallucinate. Built-in guardrails (calibrated verdicts, hazard callouts, data-age disclosure, auto-downgrade of low-confidence SENDABLE calls, and a "not a safety clearance" disclaimer on every result) reduce but **do not eliminate** that risk.
 
 Make sure your community understands:
 - A green **SENDABLE** means *conditions appear favorable per available data* — not that it's safe, and not a go-ahead.

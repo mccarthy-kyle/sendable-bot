@@ -31,16 +31,18 @@ const VERDICT_META = {
 };
 
 function buildEmbed(routeName, targetDate, beta, queryId, tally) {
-  // ── Code-level safety net (defense in depth, independent of the model) ──
-  // If the model returns SENDABLE but confidence is low or it admits proxy/no
-  // data, force the DISPLAYED verdict down to MARGINAL. We never up-rank.
-  const lowConfidence = (beta.confidence ?? 0) < 0.6;
-  const proxyOrStale = /proxy|no.*data|unknown|stale|no on-route/i.test(
-    `${beta.route_match || ''} ${beta.data_age || ''}`
+  // ── Light safety net ──
+  // We trust a SENDABLE backed by good data. Only step in when the model itself
+  // says it had NO real route data (pure proxy / no data found) AND was very
+  // unconfident — that's the one case a green check would be actively misleading.
+  // We never up-rank, and a normal confident SENDABLE on recent reports stands.
+  const veryLowConfidence = (beta.confidence ?? 1) < 0.35;
+  const noRealData = /no on-route|no current data|incomplete response|could not find/i.test(
+    `${beta.route_match || ''} ${beta.data_age || ''} ${beta.summary || ''}`
   );
-  if (beta.verdict === 'SENDABLE' && (lowConfidence || proxyOrStale)) {
+  if (beta.verdict === 'SENDABLE' && noRealData && veryLowConfidence) {
     beta.verdict = 'MARGINAL';
-    beta.summary = `⚠️ Auto-downgraded from SENDABLE: the underlying data was ${lowConfidence ? 'low-confidence' : 'proxy/stale'}, so this cannot be called a confident send. ${beta.summary || ''}`;
+    beta.summary = `⚠️ Couldn't find recent on-route data to confirm a confident send. ${beta.summary || ''}`;
   }
 
   const meta = VERDICT_META[beta.verdict] || VERDICT_META.MARGINAL;
