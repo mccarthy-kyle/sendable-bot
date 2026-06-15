@@ -55,7 +55,7 @@ function buildEmbed(routeName, targetDate, beta, queryId, tally) {
   const embed = new EmbedBuilder()
     .setColor(meta.color)
     .setTitle(`${meta.emoji} ${routeName} — ${meta.label}`)
-    .setDescription(`${matchNote}${beta.summary || ''}`)
+    .setDescription(`${matchNote}${beta.summary || ''}`.slice(0, 4000))
     .addFields(
       { name: '🕐 Data recency', value: beta.data_age || '⚠️ unknown — treat with caution' },
       { name: '⚠️ Hazards', value: beta.hazards || 'Assess avalanche, snow, exposure & weather yourself before committing.' },
@@ -173,15 +173,35 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // ---- /routes : list stored routes ----
     if (interaction.isChatInputCommand() && interaction.commandName === 'routes') {
-      const rows = listRoutes();
+      const rows = listRoutes(500); // pull more, then summarize/cap for display
       if (rows.length === 0) {
-        await interaction.reply({ content: 'No custom routes defined yet. Use `/defineroute` to add one.', ephemeral: true });
+        await interaction.reply({ content: 'No routes stored yet. Use `/defineroute` to add one, or seed from COTREX/Strava.', ephemeral: true });
         return;
       }
-      const list = rows.map(r =>
-        `• **${r.canonical_name}** — ${r.route_type || 'route'}${r.distance_km ? `, ${r.distance_km}km` : ''}${r.peak ? ` (${r.peak})` : ''}`
-      ).join('\n');
-      await interaction.reply({ content: `**Stored routes:**\n${list}`, ephemeral: true });
+
+      // With COTREX loaded there can be hundreds of trails — far past Discord's
+      // 2000-char message limit. Show enriched/user routes in full, then a count
+      // of the bulk trail entries, and keep the whole thing under the cap.
+      const enriched = rows.filter(r => r.source && r.source !== 'cotrex');
+      const cotrex = rows.filter(r => r.source === 'cotrex');
+
+      let body = '';
+      if (enriched.length) {
+        body += '**Defined / imported routes:**\n';
+        body += enriched.map(r =>
+          `• **${r.canonical_name}** — ${r.route_type || 'route'}${r.distance_km ? `, ${r.distance_km}km` : ''}${r.peak ? ` (${r.peak})` : ''}`
+        ).join('\n');
+      }
+      if (cotrex.length) {
+        // Just list a sample of trail names + the total count, to stay under 2000 chars.
+        const sample = cotrex.slice(0, 15).map(r => r.canonical_name).join(', ');
+        body += `\n\n**COTREX trails:** ${cotrex.length} loaded (e.g. ${sample}…)\nUse \`/sendable route:"<name>"\` to query any of them.`;
+      }
+
+      // Hard safety cap so we never hit the 2000-char error again.
+      if (body.length > 1900) body = body.slice(0, 1900) + '\n…(truncated)';
+
+      await interaction.reply({ content: body, ephemeral: true });
       return;
     }
 
