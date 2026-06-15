@@ -57,6 +57,8 @@ Confidence 78% · 👍 0 👎 0 · vote + report conditions to tune me
 
 The bot distinguishes *which* route on a peak you mean. A query with a qualifier like `360`, `loop`, `traverse`, `ridge`, `couloir`, or `linkup` (or any route saved via `/defineroute`) will not be answered with standard out-and-back conditions. Reports are tagged ON_ROUTE / PARTIAL / WRONG_ROUTE, and a "perfect conditions" report for the wrong route is demoted to labeled proxy data rather than driving the verdict. When only standard-route data exists, the embed says so and infers for the actual route.
 
+**Identifying unknown routes.** If a route isn't in the database, the bot does NOT dead-end. It runs Colorado-specific searches (appends "Colorado", tries FKT/14ers/figure-eight/linkup phrasings) and reasons about descriptive nicknames — e.g. "infinity loop" = the Elbert–Massive figure-eight, "the tour"/"traverse"/"horseshoe" = linkups. Only if still unresolved after real searching does it ask one short locating question, never a wall of disclaimers.
+
 ---
 
 ## The self-healing loop

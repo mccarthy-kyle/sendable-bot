@@ -1,5 +1,20 @@
 [
   {
+    "canonical_name": "Elbert-Massive Infinity Loop",
+    "aliases": "[\"infinity loop\", \"infinity loop colorado\", \"elbert massive infinity loop\", \"elbert massive loop\", \"the infinity loop\"]",
+    "peak": "Mount Elbert + Mount Massive",
+    "route_type": "linkup",
+    "distance_km": 45.0,
+    "gain_m": 2987,
+    "region": "sawatch",
+    "elevation_m": 4401,
+    "key_terrain": "Figure-eight linking Colorado's two tallest 14ers (Elbert 14,440 + Massive 14,421) from the Elbert/Twin Lakes TH near Buena Vista. ~27-29 mi, ~9,700 ft gain. Typical flow: ascend Massive (East Slopes), descend SW slope, cross the connecting valley, ascend Elbert (SE Ridge), descend (NE Ridge). Both summits are above 14,400 ft with extended high exposure.",
+    "aspects": "Multiple aspects on both peaks; the connecting valley and north-facing slopes hold snow longest; long sustained time above treeline = afternoon lightning exposure.",
+    "distinct_from_standard": "This is a 27-29 mile two-peak figure-eight, NOT the standard Elbert or Massive out-and-back. Standard single-peak conditions do not capture the full linkup, the valley crossing, or the cumulative exposure.",
+    "source": "user",
+    "created_by": "seed"
+  },
+  {
     "canonical_name": "Yale with curly",
     "aliases": "[\"mount yale\",\"yale\"]",
     "peak": "Mount Yale",
