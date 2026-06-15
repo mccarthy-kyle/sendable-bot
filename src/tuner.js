@@ -63,7 +63,7 @@ function applyCorrection(corr) {
   const actual = (corr.corrected_verdict || '').toUpperCase();
   if (!actual) return;
 
-  const order = { SENDABLE: 2, MARGINAL: 1, NOT_YET: 0 };
+  const order = { SENDABLE: 3, LIKELY: 2, MARGINAL: 1, NOT_YET: 0 };
   const pv = order[predicted];
   const av = order[actual];
 

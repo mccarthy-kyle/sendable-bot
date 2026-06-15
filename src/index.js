@@ -26,6 +26,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const VERDICT_META = {
   SENDABLE:  { color: 0x4ade80, emoji: '✅', label: 'SENDABLE' },
+  LIKELY:    { color: 0x84cc16, emoji: '🟢', label: 'LIKELY GOOD' },
   MARGINAL:  { color: 0xfbbf24, emoji: '⚠️', label: 'MARGINAL' },
   NOT_YET:   { color: 0xef4444, emoji: '❌', label: 'NOT YET' },
 };
@@ -46,33 +47,39 @@ function buildEmbed(routeName, targetDate, beta, queryId, tally) {
   }
 
   const meta = VERDICT_META[beta.verdict] || VERDICT_META.MARGINAL;
-  // Lead with a route-match note when the data was a proxy or a stored route matched.
-  let matchNote = '';
-  if (beta._stored_route) matchNote = `📌 Matched stored route: **${beta._stored_route}**\n`;
-  else if (beta._is_variant) matchNote = `⚠️ Non-standard route — verified data is route-specific where available\n`;
-  if (beta.route_match && /proxy/i.test(beta.route_match)) {
-    matchNote += `⚠️ *Only standard-route proxy data found — verdict is inferred for the actual route.*\n`;
-  }
+
+  // TLDR is the headline. Fall back to first sentence of summary if model omitted it.
+  const tldr = beta.tldr
+    || (beta.summary ? beta.summary.split(/(?<=[.!?])\s/)[0] : '')
+    || 'See details below.';
+
+  // Route-match flags, compressed to one short line if present.
+  let flag = '';
+  if (beta._stored_route) flag = `📌 ${beta._stored_route}`;
+  else if (beta.route_match && /proxy/i.test(beta.route_match)) flag = '⚠️ standard-route proxy data — inferred for actual route';
+  else if (beta._is_variant) flag = '⚠️ non-standard route';
 
   const embed = new EmbedBuilder()
     .setColor(meta.color)
     .setTitle(`${meta.emoji} ${routeName} — ${meta.label}`)
-    .setDescription(`${matchNote}${beta.summary || ''}`.slice(0, 4000))
+    .setDescription(`**TL;DR — ${tldr}**${flag ? `\n*${flag}*` : ''}`.slice(0, 400))
     .addFields(
-      { name: '🕐 Data recency', value: beta.data_age || '⚠️ unknown — treat with caution' },
-      { name: '⚠️ Hazards', value: beta.hazards || 'Assess avalanche, snow, exposure & weather yourself before committing.' },
-      { name: '❄️ Snowpack', value: beta.snotel || '—' },
-      { name: '📋 Trip reports', value: beta.trip_reports || '—' },
-      { name: '🥾 AllTrails', value: beta.alltrails || '—' },
-      { name: `🌤️ Weather${targetDate ? ` (${targetDate})` : ''}`, value: beta.weather || '—' },
-      { name: '📅 Day pick', value: beta.day_recommendation || '—' },
-      { name: '🛟 This is not a safety clearance', value: 'Conditions estimate from web data, often incomplete and may be wrong. NOT an avalanche forecast — check [CAIC](https://avalanche.state.co.us). Verify with current reports and your own judgment. You own the go/no-go.' },
+      // Compact two-column layout; details for those who want them.
+      { name: '❄️ Snow / pack', value: (beta.snotel || '—').slice(0, 200), inline: true },
+      { name: `🌤️ Weather${targetDate ? ` (${targetDate})` : ''}`, value: (beta.weather || '—').slice(0, 200), inline: true },
+      { name: '📋 Recent reports', value: (beta.trip_reports || '—').slice(0, 250) },
+      { name: '⚠️ Watch for', value: (beta.hazards || 'Assess avalanche, snow, exposure & weather yourself.').slice(0, 250) },
+      { name: '📅 Day pick', value: (beta.day_recommendation || '—').slice(0, 200) },
     )
     .setFooter({
-      text: `Confidence ${(Math.round((beta.confidence ?? 0.5) * 100))}% · 👍 ${tally.up} 👎 ${tally.down} · vote + report conditions to tune me`,
+      text: `${Math.round((beta.confidence ?? 0.5) * 100)}% confidence · ${beta.data_age || 'recency unknown'} · not a safety call — check CAIC · 👍${tally.up} 👎${tally.down}`,
     })
     .setTimestamp();
 
+  // Optional: full detail only when the user wants it — keep the main card lean.
+  if (beta.summary && beta.summary.length > tldr.length + 20) {
+    embed.addFields({ name: '📖 More', value: beta.summary.slice(0, 600) });
+  }
   if (beta.sources?.length) {
     embed.addFields({
       name: '🔗 Sources',
@@ -269,6 +276,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const q = getQuery(queryId);
       const rawVerdict = interaction.fields.getTextInputValue('actual_verdict').trim().toUpperCase();
       const normalized = rawVerdict.includes('SEND') ? 'SENDABLE'
+        : rawVerdict.includes('LIKELY') ? 'LIKELY'
         : rawVerdict.includes('NOT') ? 'NOT_YET'
         : 'MARGINAL';
 
