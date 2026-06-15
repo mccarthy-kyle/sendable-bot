@@ -90,17 +90,35 @@ export function migrate() {
       canonical_name TEXT NOT NULL,          -- "Mount Yale 360"
       aliases TEXT,                           -- JSON array of lowercased alt names
       peak TEXT,                              -- "Mount Yale" (the underlying summit/area)
-      route_type TEXT,                        -- 'loop','traverse','ridge','out-and-back','linkup','couloir'
+      route_type TEXT,                        -- 'loop','traverse','ridge','out-and-back','linkup','couloir','trail'
       distance_km REAL,
       gain_m REAL,
       key_terrain TEXT,                       -- what distinguishes it: segments, junctions, off-trail bits
       aspects TEXT,                           -- e.g. "north-facing CT section, exposed W ridge"
       distinct_from_standard TEXT,            -- why standard-route beta does NOT transfer
-      source TEXT,                            -- 'strava:1234','alltrails:url','user'
+      lat REAL,                               -- representative coordinate (for region/elevation filtering)
+      lon REAL,
+      elevation_m REAL,                       -- peak/high-point elevation if known
+      region TEXT,                            -- 'sawatch','sangre','front','san_juan','elk','mosquito',...
+      source TEXT,                            -- 'strava:1234','alltrails:url','user','cotrex','peakbagger'
       created_by TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_routes_name ON routes(canonical_name);
+
+    -- Peaks catalog (from Peakbagger / coordinate sources). Summits, not routes.
+    CREATE TABLE IF NOT EXISTS peaks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      lat REAL,
+      lon REAL,
+      elevation_m REAL,
+      prominence_m REAL,
+      region TEXT,
+      source TEXT,                            -- 'peakbagger:1234'
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_peaks_name ON peaks(name);
   `);
 
   // Seed defaults if empty
@@ -111,6 +129,27 @@ export function migrate() {
   for (const s of ['snotel', '14ers', 'alltrails', 'strava', 'weather']) {
     seedSources.run(s, now);
   }
+
+  // --- Idempotent column adds for databases created before these columns existed.
+  // CREATE TABLE IF NOT EXISTS won't alter an existing table, so patch missing columns.
+  const ensureColumn = (table, col, type) => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+    if (!cols.includes(col)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+      console.log(`Migrated: added ${table}.${col}`);
+    }
+  };
+  for (const [col, type] of [
+    ['lat', 'REAL'], ['lon', 'REAL'], ['elevation_m', 'REAL'], ['region', 'TEXT'],
+  ]) ensureColumn('routes', col, type);
+
+  // Indexes that depend on the patched columns — safe to create now that the
+  // columns are guaranteed to exist on both new and pre-existing databases.
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_routes_region ON routes(region);
+    CREATE INDEX IF NOT EXISTS idx_routes_elev ON routes(elevation_m);
+    CREATE INDEX IF NOT EXISTS idx_peaks_elev ON peaks(elevation_m);
+  `);
 
   const seedThresh = db.prepare(
     `INSERT OR IGNORE INTO verdict_thresholds
@@ -193,31 +232,55 @@ export function getRouteBias(routeName) {
 export function saveRoute(r) {
   return db.prepare(`
     INSERT INTO routes (canonical_name, aliases, peak, route_type, distance_km, gain_m,
-      key_terrain, aspects, distinct_from_standard, source, created_by, created_at)
+      key_terrain, aspects, distinct_from_standard, lat, lon, elevation_m, region, source, created_by, created_at)
     VALUES (@canonical_name, @aliases, @peak, @route_type, @distance_km, @gain_m,
-      @key_terrain, @aspects, @distinct_from_standard, @source, @created_by, @created_at)
-  `).run(r);
+      @key_terrain, @aspects, @distinct_from_standard, @lat, @lon, @elevation_m, @region, @source, @created_by, @created_at)
+  `).run({
+    lat: null, lon: null, elevation_m: null, region: null, // defaults so callers needn't pass them
+    ...r,
+  });
 }
 
 // Find a stored route by fuzzy-matching the query against canonical names + aliases.
+// QUERY-TIME FILTERING: when multiple trails match (the 40k COTREX problem), prefer
+// (1) higher name-match score, then (2) enriched/user/peakbagger routes over raw
+// COTREX trail rows, then (3) higher elevation / known alpine regions. This keeps
+// urban greenways from outranking the alpine route the user actually means.
+const ALPINE_REGIONS = new Set(['sawatch', 'sangre', 'san_juan', 'elk', 'mosquito', 'front', 'tenmile', 'gore', 'needle']);
+
 export function findRoute(query) {
   const q = normalizeRoute(query);
   const all = db.prepare(`SELECT * FROM routes`).all();
-  let best = null;
-  let bestScore = 0;
+  const candidates = [];
   for (const r of all) {
     const names = [r.canonical_name, ...(safeParse(r.aliases) || [])].map(normalizeRoute);
-    for (const name of names) {
-      const score = matchScore(q, name);
-      if (score > bestScore) { bestScore = score; best = r; }
-    }
+    let nameScore = 0;
+    for (const name of names) nameScore = Math.max(nameScore, matchScore(q, name));
+    if (nameScore >= 0.6) candidates.push({ r, nameScore });
   }
-  // Require a reasonably strong match to avoid false positives.
-  return bestScore >= 0.6 ? best : null;
+  if (candidates.length === 0) return null;
+
+  // Composite ranking: name match dominates, then enrichment, then alpine relevance.
+  const score = ({ r, nameScore }) => {
+    let s = nameScore * 100;
+    if (r.source && r.source !== 'cotrex') s += 15;           // enriched/user/peakbagger beats raw trail
+    if (r.distinct_from_standard && !/needs enrichment/i.test(r.distinct_from_standard)) s += 10;
+    if (r.elevation_m && r.elevation_m > 3500) s += 8;        // >~11,500 ft = alpine
+    if (r.region && ALPINE_REGIONS.has(r.region)) s += 5;
+    return s;
+  };
+  candidates.sort((a, b) => score(b) - score(a));
+  return candidates[0].r;
 }
 
-export function listRoutes() {
-  return db.prepare(`SELECT canonical_name, peak, route_type, distance_km FROM routes ORDER BY canonical_name`).all();
+export function listRoutes(limit = 50) {
+  // Show enriched routes first; they're the ones people actually care about.
+  return db.prepare(`
+    SELECT canonical_name, peak, route_type, distance_km, source
+    FROM routes
+    ORDER BY (source != 'cotrex') DESC, canonical_name
+    LIMIT ?
+  `).all(limit);
 }
 
 // Fetch recent free-form field reports from users for a route, newest first.

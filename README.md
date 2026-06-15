@@ -121,11 +121,38 @@ The bot can seed its route library from **COTREX** (Colorado Trail Explorer), th
 npm run seed:cotrex
 ```
 
-This pulls every named, maintained Colorado trail with reliable metadata (name, length, use type/manager) and stores it in the `routes` table, marked `source: cotrex`. Re-runnable — it skips trails already stored, so running it again only adds new ones.
+This pulls every named, maintained Colorado trail with reliable metadata (name, length, use type/manager) and stores it in the `routes` table, marked `source: cotrex`. Re-runnable — it skips trails already stored.
 
-**What COTREX is good for:** the maintained, named-trail backbone (CT segments, approach trails, named trails). **What it doesn't contain:** off-trail peak linkups or informal route names (e.g. "Yale 360", "Nolan's"). COTREX maps trail *segments*, not curated *routes* — so those still come from `/defineroute`, which enriches them with 14ers.com/AllTrails research. COTREX entries are flagged as needing route-level enrichment.
+**What COTREX is good for:** the maintained, named-trail backbone (CT segments, approach trails). **What it doesn't contain:** off-trail peak linkups or informal route names (e.g. "Yale 360", "Nolan's") — those come from `/defineroute`.
 
-To point at a different COTREX mirror if the public endpoint changes, set `COTREX_URL` to a `.../FeatureServer/<id>` layer.
+To point at a different COTREX mirror if the endpoint changes, set `COTREX_URL` to a `.../FeatureServer/<id>` layer.
+
+### The 40k-trails noise problem — handled at query time
+
+COTREX dumps the whole state in, including urban greenways. Rather than filtering at import, the bot filters when it *matches* a route: `findRoute` ranks candidates by name match first, then prefers enriched/user/peakbagger routes over raw COTREX rows, then higher elevation (>~11,500 ft) and known alpine regions (Sawatch, Sangres, San Juans, etc.). So a query for an alpine route won't get hijacked by a same-named city path. `/routes` also lists enriched routes before raw COTREX trails.
+
+## Seeding your own routes (Strava + curated JSON)
+
+`seeds/strava-routes.json` holds routes curated from your Strava run/hike history (Yale, Shavano, Browns Creek, Salida, Collegiate, Sangre series). Load it with:
+
+```bash
+npm run seed:json seeds/strava-routes.json
+```
+
+This is a generic JSON importer — any file that's an array of route objects (`canonical_name`, `aliases`, `peak`, `region`, `distance_km`, etc.) works. Re-runnable, dedupes by name. To add more routes, append to the JSON file and re-run.
+
+**Note on Strava:** the MCP exposes activities, not saved routes, and your activity *names* are often personal ("string bean boys") rather than route names — so the seed is hand-curated down to the entries with real geography. AllTrails Pro does not expose an API, so AllTrails routes come in one at a time via `/defineroute` with a URL.
+
+---
+
+## Bulk-loading peaks from Peakbagger
+
+```bash
+npm run seed:peakbagger -- --range=10000-10050
+npm run seed:peakbagger -- --ids=1234,5678
+```
+
+A **polite, rate-limited** importer for Colorado peak coordinates/elevation/prominence into the `peaks` table. It is intentionally gentle — hard delay between requests (default 3s, set `PEAKBAGGER_DELAY_MS`), a per-run cap (default 50, set `PEAKBAGGER_MAX`), Colorado bounding-box filter, and dedupe by name. It is **not** a blind full-site crawler; be a good citizen and don't crank the limits. Peakbagger has no official API, so if they ever ask you to stop, stop.
 
 ---
 
@@ -138,6 +165,9 @@ To point at a different COTREX mirror if the public endpoint changes, set `COTRE
 | `src/db.js` | SQLite schema + accessors (queries, feedback, corrections, routes, learned params) |
 | `src/register-commands.js` | One-time slash command registration |
 | `src/seed-cotrex.js` | Bulk-imports Colorado trails from the COTREX open-data API into the routes table (re-runnable) |
+| `src/seed-peakbagger.js` | Polite, rate-limited importer for Colorado peak coordinates/elevation into the peaks table |
+| `src/seed-json.js` | Generic importer for a JSON array of routes (used for the curated Strava seed) |
+| `seeds/strava-routes.json` | Curated routes from your Strava run/hike history |
 
 ---
 

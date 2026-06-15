@@ -1,0 +1,76 @@
+[
+  {
+    "canonical_name": "Yale with curly",
+    "aliases": "[\"mount yale\",\"yale\"]",
+    "peak": "Mount Yale",
+    "route_type": "run",
+    "distance_km": 14.9,
+    "gain_m": 1345,
+    "region": "sawatch",
+    "elevation_m": 4327,
+    "key_terrain": "Mount Yale ascent, Sawatch 14er. Strava: pain free hiking.",
+    "source": "strava:18722038813",
+    "created_by": "seed"
+  },
+  {
+    "canonical_name": "Shavano with Curly",
+    "aliases": "[\"mount shavano\",\"shavano\"]",
+    "peak": "Mount Shavano",
+    "route_type": "run",
+    "distance_km": 16.1,
+    "gain_m": 1406,
+    "region": "sawatch",
+    "elevation_m": 4337,
+    "key_terrain": "Mount Shavano ascent, Sawatch 14er. Strava: 95% clear (April).",
+    "source": "strava:18084285487",
+    "created_by": "seed"
+  },
+  {
+    "canonical_name": "Dog mogging on browns creek",
+    "aliases": "[\"browns creek\",\"little browns\"]",
+    "peak": null,
+    "route_type": "run",
+    "distance_km": 26.3,
+    "gain_m": 1337,
+    "region": "sawatch",
+    "key_terrain": "Browns Creek trail, Sawatch. Strava: Little Browns is bone dry.",
+    "source": "strava:18163342565",
+    "created_by": "seed"
+  },
+  {
+    "canonical_name": "Salida loop",
+    "aliases": "[\"salida\"]",
+    "peak": null,
+    "route_type": "loop",
+    "distance_km": 32.3,
+    "gain_m": 970,
+    "region": "sawatch",
+    "key_terrain": "Salida-area loop.",
+    "source": "strava:18442617237",
+    "created_by": "seed"
+  },
+  {
+    "canonical_name": "Collegiate course sweeping",
+    "aliases": "[\"collegiate\",\"collegiate peaks\"]",
+    "peak": null,
+    "route_type": "run",
+    "distance_km": 16.6,
+    "gain_m": 507,
+    "region": "sawatch",
+    "key_terrain": "Collegiate Peaks course section.",
+    "source": "strava:18363468382",
+    "created_by": "seed"
+  },
+  {
+    "canonical_name": "Sangre social series",
+    "aliases": "[\"sangre\",\"phantom terrace\"]",
+    "peak": null,
+    "route_type": "run",
+    "distance_km": 32.5,
+    "gain_m": 1580,
+    "region": "sangre",
+    "key_terrain": "Sangre de Cristo social series long run, includes Phantom Terrace area.",
+    "source": "strava:18626025245",
+    "created_by": "seed"
+  }
+]
