@@ -220,6 +220,19 @@ export function listRoutes() {
   return db.prepare(`SELECT canonical_name, peak, route_type, distance_km FROM routes ORDER BY canonical_name`).all();
 }
 
+// Fetch recent free-form field reports from users for a route, newest first.
+// These are real on-the-ground notes that should directly inform future verdicts.
+export function getRouteNotes(routeName, limit = 5) {
+  const rn = normalizeRoute(routeName);
+  return db.prepare(`
+    SELECT note, corrected_verdict, ground_truth_date, created_at
+    FROM corrections
+    WHERE route_name = ? AND note IS NOT NULL AND TRIM(note) != ''
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(rn, limit);
+}
+
 // Simple token-overlap score (0..1). "yale 360" vs "mount yale 360" -> high.
 function matchScore(a, b) {
   const ta = new Set(a.split(' ').filter(Boolean));

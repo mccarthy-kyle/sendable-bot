@@ -14,7 +14,7 @@ import {
 import { randomUUID } from 'crypto';
 import {
   migrate, saveQuery, recordVote, getQuery, getVoteTally, saveCorrection,
-  saveRoute, listRoutes,
+  saveRoute, listRoutes, normalizeRoute,
 } from './db.js';
 import { runBeta } from './beta-engine.js';
 import { buildRouteDefinition } from './route-builder.js';
@@ -67,7 +67,7 @@ function buildEmbed(routeName, targetDate, beta, queryId, tally) {
       { name: '🛟 This is not a safety clearance', value: 'Conditions estimate from web data, often incomplete and may be wrong. NOT an avalanche forecast — check [CAIC](https://avalanche.state.co.us). Verify with current reports and your own judgment. You own the go/no-go.' },
     )
     .setFooter({
-      text: `Confidence ${(Math.round((beta.confidence ?? 0.5) * 100))}% · 👍 ${tally.up} 👎 ${tally.down} · react to train me`,
+      text: `Confidence ${(Math.round((beta.confidence ?? 0.5) * 100))}% · 👍 ${tally.up} 👎 ${tally.down} · vote + report conditions to tune me`,
     })
     .setTimestamp();
 
@@ -196,7 +196,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         // Re-render footer with updated tally
         const embed = EmbedBuilder.from(interaction.message.embeds[0])
           .setFooter({
-            text: `Confidence ${Math.round((q.confidence ?? 0.5) * 100)}% · 👍 ${tally.up} 👎 ${tally.down} · react to train me`,
+            text: `Confidence ${Math.round((q.confidence ?? 0.5) * 100)}% · 👍 ${tally.up} 👎 ${tally.down} · vote + report conditions to tune me`,
           });
         await interaction.update({ embeds: [embed] });
 
@@ -212,19 +212,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const verdictInput = new TextInputBuilder()
           .setCustomId('actual_verdict')
-          .setLabel('What was it really? (sendable/marginal/not yet)')
+          .setLabel('What was it really?')
+          .setPlaceholder('sendable / marginal / not yet')
           .setStyle(TextInputStyle.Short)
           .setRequired(true);
 
         const dateInput = new TextInputBuilder()
           .setCustomId('actual_date')
-          .setLabel('When did you go? (e.g. 2026-06-21)')
+          .setLabel('When did you go?')
+          .setPlaceholder('e.g. 2026-06-21')
           .setStyle(TextInputStyle.Short)
           .setRequired(false);
 
         const noteInput = new TextInputBuilder()
           .setCustomId('note')
           .setLabel('What did you find out there?')
+          .setPlaceholder('Snow, creek crossings, hazards, where you turned around...')
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(false);
 
@@ -249,7 +252,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       saveCorrection({
         query_id: queryId,
-        route_name: q?.route_name || 'unknown',
+        route_name: normalizeRoute(q?.route_name || 'unknown'),
         discord_user_id: interaction.user.id,
         corrected_verdict: normalized,
         note: interaction.fields.getTextInputValue('note') || '',

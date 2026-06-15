@@ -4,7 +4,7 @@
 // report standard-route conditions as if they apply to a loop/traverse/ridge.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { getSourceWeights, getThresholds, getRouteBias, findRoute } from './db.js';
+import { getSourceWeights, getThresholds, getRouteBias, findRoute, getRouteNotes } from './db.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
@@ -115,7 +115,22 @@ export async function runBeta({ routeName, targetDate }) {
   const isVariant = detectVariant(routeName);
   const routeContext = buildRouteContext(storedRoute, isVariant, routeName);
 
-  const system = buildSystemPrompt({ weights, runThresh, peakThresh, routeBias, routeName, routeContext });
+  // Pull real field reports our own users submitted for this route.
+  const notes = getRouteNotes(routeName, 5);
+  let communityBlock = '';
+  if (notes.length > 0) {
+    const formatted = notes.map(n => {
+      const when = n.ground_truth_date || new Date(n.created_at).toISOString().slice(0, 10);
+      return `- [${when}] reported it ${n.corrected_verdict || '?'}: "${(n.note || '').slice(0, 400)}"`;
+    }).join('\n');
+    communityBlock = `
+
+COMMUNITY FIELD REPORTS for this route (submitted by our own runners — treat as HIGH-VALUE, on-the-ground ground truth, weighted above generic web sources; the most recent one matters most, but note its date and whether conditions may have changed since):
+${formatted}`;
+  }
+
+  const system = buildSystemPrompt({ weights, runThresh, peakThresh, routeBias, routeName, routeContext })
+    + communityBlock;
   const userMsg = `Route: ${routeName}\nTarget date: ${targetDate || 'not specified — give current conditions and note that'}`;
 
   const response = await anthropic.messages.create({
