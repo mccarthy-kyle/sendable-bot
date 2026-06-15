@@ -14,8 +14,10 @@ import {
 import { randomUUID } from 'crypto';
 import {
   migrate, saveQuery, recordVote, getQuery, getVoteTally, saveCorrection,
+  saveRoute, listRoutes,
 } from './db.js';
 import { runBeta } from './beta-engine.js';
+import { buildRouteDefinition } from './route-builder.js';
 import { runTuner } from './tuner.js';
 
 migrate();
@@ -29,17 +31,40 @@ const VERDICT_META = {
 };
 
 function buildEmbed(routeName, targetDate, beta, queryId, tally) {
+  // ── Code-level safety net (defense in depth, independent of the model) ──
+  // If the model returns SENDABLE but confidence is low or it admits proxy/no
+  // data, force the DISPLAYED verdict down to MARGINAL. We never up-rank.
+  const lowConfidence = (beta.confidence ?? 0) < 0.6;
+  const proxyOrStale = /proxy|no.*data|unknown|stale|no on-route/i.test(
+    `${beta.route_match || ''} ${beta.data_age || ''}`
+  );
+  if (beta.verdict === 'SENDABLE' && (lowConfidence || proxyOrStale)) {
+    beta.verdict = 'MARGINAL';
+    beta.summary = `⚠️ Auto-downgraded from SENDABLE: the underlying data was ${lowConfidence ? 'low-confidence' : 'proxy/stale'}, so this cannot be called a confident send. ${beta.summary || ''}`;
+  }
+
   const meta = VERDICT_META[beta.verdict] || VERDICT_META.MARGINAL;
+  // Lead with a route-match note when the data was a proxy or a stored route matched.
+  let matchNote = '';
+  if (beta._stored_route) matchNote = `📌 Matched stored route: **${beta._stored_route}**\n`;
+  else if (beta._is_variant) matchNote = `⚠️ Non-standard route — verified data is route-specific where available\n`;
+  if (beta.route_match && /proxy/i.test(beta.route_match)) {
+    matchNote += `⚠️ *Only standard-route proxy data found — verdict is inferred for the actual route.*\n`;
+  }
+
   const embed = new EmbedBuilder()
     .setColor(meta.color)
     .setTitle(`${meta.emoji} ${routeName} — ${meta.label}`)
-    .setDescription(beta.summary || '')
+    .setDescription(`${matchNote}${beta.summary || ''}`)
     .addFields(
+      { name: '🕐 Data recency', value: beta.data_age || '⚠️ unknown — treat with caution' },
+      { name: '⚠️ Hazards', value: beta.hazards || 'Assess avalanche, snow, exposure & weather yourself before committing.' },
       { name: '❄️ Snowpack', value: beta.snotel || '—' },
       { name: '📋 Trip reports', value: beta.trip_reports || '—' },
       { name: '🥾 AllTrails', value: beta.alltrails || '—' },
       { name: `🌤️ Weather${targetDate ? ` (${targetDate})` : ''}`, value: beta.weather || '—' },
       { name: '📅 Day pick', value: beta.day_recommendation || '—' },
+      { name: '🛟 This is not a safety clearance', value: 'Conditions estimate from web data, often incomplete and may be wrong. NOT an avalanche forecast — check [CAIC](https://avalanche.state.co.us). Verify with current reports and your own judgment. You own the go/no-go.' },
     )
     .setFooter({
       text: `Confidence ${(Math.round((beta.confidence ?? 0.5) * 100))}% · 👍 ${tally.up} 👎 ${tally.down} · react to train me`,
@@ -104,6 +129,59 @@ client.on(Events.InteractionCreate, async (interaction) => {
         embeds: [buildEmbed(routeName, targetDate, beta, queryId, tally)],
         components: [buildButtons(queryId)],
       });
+      return;
+    }
+
+    // ---- /defineroute : register a custom route from Strava/AllTrails/description ----
+    if (interaction.isChatInputCommand() && interaction.commandName === 'defineroute') {
+      const name = interaction.options.getString('name', true);
+      const stravaUrl = interaction.options.getString('strava') || null;
+      const alltrailsUrl = interaction.options.getString('alltrails') || null;
+      const description = interaction.options.getString('description') || null;
+      await interaction.deferReply();
+
+      const def = await buildRouteDefinition({ name, stravaUrl, alltrailsUrl, description });
+      saveRoute({
+        canonical_name: def.canonical_name || name,
+        aliases: JSON.stringify(def.aliases || []),
+        peak: def.peak || null,
+        route_type: def.route_type || null,
+        distance_km: def.distance_km ?? null,
+        gain_m: def.gain_m ?? null,
+        key_terrain: def.key_terrain || null,
+        aspects: def.aspects || null,
+        distinct_from_standard: def.distinct_from_standard || null,
+        source: def.source || 'user',
+        created_by: interaction.user.id,
+        created_at: Date.now(),
+      });
+
+      const embed = new EmbedBuilder()
+        .setColor(0x60a5fa)
+        .setTitle(`📌 Route saved: ${def.canonical_name || name}`)
+        .setDescription(def.distinct_from_standard || 'Stored. Future /sendable calls will match this route.')
+        .addFields(
+          { name: 'Type', value: def.route_type || '—', inline: true },
+          { name: 'Distance', value: def.distance_km ? `${def.distance_km} km` : '—', inline: true },
+          { name: 'Gain', value: def.gain_m ? `${def.gain_m} m` : '—', inline: true },
+          { name: 'Key terrain', value: def.key_terrain || '—' },
+          { name: 'Aliases', value: (def.aliases || []).join(', ') || '—' },
+        );
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    // ---- /routes : list stored routes ----
+    if (interaction.isChatInputCommand() && interaction.commandName === 'routes') {
+      const rows = listRoutes();
+      if (rows.length === 0) {
+        await interaction.reply({ content: 'No custom routes defined yet. Use `/defineroute` to add one.', ephemeral: true });
+        return;
+      }
+      const list = rows.map(r =>
+        `• **${r.canonical_name}** — ${r.route_type || 'route'}${r.distance_km ? `, ${r.distance_km}km` : ''}${r.peak ? ` (${r.peak})` : ''}`
+      ).join('\n');
+      await interaction.reply({ content: `**Stored routes:**\n${list}`, ephemeral: true });
       return;
     }
 

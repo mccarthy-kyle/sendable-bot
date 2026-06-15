@@ -2,6 +2,18 @@
 
 A Discord bot for trail-running communities that answers **"is it sendable?"** for Colorado peaks, passes, and trails — and **gets smarter over time** from your community's feedback.
 
+## ⚠️ Safety — read this before letting anyone rely on it
+
+**This bot is not a safety system and its verdicts are not clearance to go.** It reads incomplete public web data through an LLM and *will sometimes be wrong* — it can miss a recent storm, misread a report, or hallucinate. Built-in guardrails (conservative defaults, mandatory hazard callouts, data-age disclosure, auto-downgrade of low-confidence SENDABLE calls, and a "not a safety clearance" disclaimer on every result) reduce but **do not eliminate** that risk.
+
+Make sure your community understands:
+- A green **SENDABLE** means *conditions appear favorable per available data* — not that it's safe, and not a go-ahead.
+- It is **not an avalanche forecast**. For any snow travel, check [CAIC](https://avalanche.state.co.us).
+- Recent on-route reports, the current forecast, and personal judgment always override the bot.
+- The person clicking "go" owns that decision, fully.
+
+If that framing isn't acceptable for your group, don't deploy it.
+
 It runs the same multi-source conditions workflow we built as the `co-mountain-beta` skill (SNOTEL snowpack, 14ers.com trip reports, AllTrails reviews, at-elevation weather forecast, CDOT), wrapped behind a `/sendable` slash command, with a 👍/👎 + "report actual conditions" feedback loop that auto-tunes the model.
 
 ---
