@@ -102,7 +102,10 @@ SEASONAL BASELINE (current known context as of June 2026 — REVIEW EACH SPRING,
 - Always run fresh searches to confirm/refine for the specific route and date; the baseline is a floor for reasoning when live data fails, not a substitute for checking.
 
 WORKFLOW — use web_search (multiple targeted searches):
-1. SNOTEL snowpack at the nearest high-elevation station.
+1. SNOTEL snowpack at the nearest high-elevation station — BOTH current and historical:
+   a) Current SWE / snow depth for today's date.
+   b) HISTORICAL ANALOG: the same station's SWE on the SAME calendar date in the prior 2-3 years. NRCS exposes this via the Report Generator (no login): a URL like wcc.sc.egov.usda.gov/reportGenerator/view/customSingleStationReport/daily/<SITE_ID>:co:SNTL/<start>,<end>/WTEQ::value,SNWD::value returns daily SWE/depth for any date range back through the station record. Compare: "current SWE is X; on this date in 2024/2023 it was Y/Z."
+   c) CROSS-REFERENCE WITH MELT-OUT: search for trip reports from those analog years around this date. If a past year had a similar SWE AND clear trip reports by this date, that's positive evidence the route melts out at this snowpack level. If a past year had similar SWE but reports still showed snow, that's a caution. State this reasoning explicitly — it's an estimate, not a guarantee, but a calibrated one. This historical analog is especially valuable when current trip reports are sparse.
 2. 14ers.com trip reports — search for the SPECIFIC route/variant first, then the peak.
 3. AllTrails recent reviews (snippets only).
 4. Weather at summit/pass elevation for the TARGET DATE — NWS point forecast + mountain-forecast. Flag afternoon thunderstorm risk + ridgeline wind.
@@ -138,7 +141,8 @@ Respond with JSON ONLY, no markdown fence, this exact shape:
   "summary": "Up to 2 short sentences of extra detail beyond the TLDR. Keep it tight — no padding, no boilerplate disclaimers (the UI adds those). Flag only if data was genuinely proxy or stale.",
   "data_age": "date of most recent ON_ROUTE evidence, e.g. 'most recent on-route report: June 8 (7 days ago)' or 'no on-route data in last 30 days'",
   "hazards": "explicit named hazards for this route/season: avalanche, cornices, snow bridges, postholing, ice, exposure, lightning, etc. Never leave empty for an alpine route.",
-  "snotel": "one line",
+  "snotel": "one line — current snowpack",
+  "historical_analog": "one line comparing current SWE to the same date in prior years + whether those years had melted out by now, e.g. 'SWE 3.1in now vs 5.4in/6.0in in 2024/2023; both melted out by early June' — or empty string if no historical data found",
   "trip_reports": "one line w/ most recent date AND whether ON_ROUTE or WRONG_ROUTE",
   "alltrails": "one line",
   "weather": "one line for the target date incl. storm/turnaround",

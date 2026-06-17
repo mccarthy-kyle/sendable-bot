@@ -67,6 +67,9 @@ function buildEmbed(routeName, targetDate, beta, queryId, tally) {
       // Compact two-column layout; details for those who want them.
       { name: '❄️ Snow / pack', value: (beta.snotel || '—').slice(0, 200), inline: true },
       { name: `🌤️ Weather${targetDate ? ` (${targetDate})` : ''}`, value: (beta.weather || '—').slice(0, 200), inline: true },
+      ...(beta.historical_analog && beta.historical_analog.trim()
+        ? [{ name: '📊 vs past years', value: beta.historical_analog.slice(0, 250) }]
+        : []),
       { name: '📋 Recent reports', value: (beta.trip_reports || '—').slice(0, 250) },
       { name: '⚠️ Watch for', value: (beta.hazards || 'Assess avalanche, snow, exposure & weather yourself.').slice(0, 250) },
       { name: '📅 Day pick', value: (beta.day_recommendation || '—').slice(0, 200) },
