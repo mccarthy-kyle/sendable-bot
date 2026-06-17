@@ -4,7 +4,7 @@ A Discord bot for trail-running communities that answers **"is it sendable?"** f
 
 ## ⚠️ Safety — read this before letting anyone rely on it
 
-**This bot is not a safety system and its verdicts are not clearance to go.** It reads incomplete public web data through an LLM and *will sometimes be wrong* — it can miss a recent storm, misread a report, or hallucinate. Built-in guardrails (calibrated verdicts, hazard callouts, data-age disclosure, auto-downgrade of low-confidence SENDABLE calls, and a "not a safety clearance" disclaimer on every result) reduce but **do not eliminate** that risk.
+**This bot is not a safety system and its verdicts are not clearance to go.** It reads incomplete public web data through an LLM and *will sometimes be wrong* — it can miss a recent storm, misread a report, or hallucinate. Built-in guardrails (calibrated verdicts, mandatory hazard callouts, data-age disclosure, a narrow safety net that downgrades only no-data/very-low-confidence SENDABLE calls, and a "not a safety call — check CAIC" line on every result) reduce but **do not eliminate** that risk.
 
 Make sure your community understands:
 - A green **SENDABLE** means *conditions appear favorable per available data* — not that it's safe, and not a go-ahead.
@@ -14,7 +14,62 @@ Make sure your community understands:
 
 If that framing isn't acceptable for your group, don't deploy it.
 
-It runs the same multi-source conditions workflow we built as the `co-mountain-beta` skill (SNOTEL snowpack, 14ers.com trip reports, AllTrails reviews, at-elevation weather forecast, CDOT), wrapped behind a `/sendable` slash command, with a 👍/👎 + "report actual conditions" feedback loop that auto-tunes the model.
+It runs a multi-source conditions workflow (SNOTEL snowpack, 14ers.com trip reports, AllTrails reviews, at-elevation weather forecast, CDOT) wrapped behind a `/sendable` slash command, with a 👍/👎 + "report actual conditions" feedback loop that tunes its behavior over time.
+
+---
+
+## How it works behind the scenes
+
+When someone runs `/sendable route:"Mount Princeton" date:"this Saturday"`, here's the full pipeline:
+
+**1. Route resolution (`beta-engine.js` + `db.js`).**
+The bot first tries to figure out *which* route is meant — not just which peak.
+- It fuzzy-matches the query against stored routes (`findRoute` in `db.js`): your `/defineroute` entries, the curated Strava routes, and the COTREX trail catalog. Matching ranks by name overlap, then prefers enriched/user-defined routes over raw imported trails, then higher-elevation/alpine-region routes — so "Princeton" finds the 14er, not a same-named city path.
+- It detects **route variants**: if the query contains `360`, `loop`, `traverse`, `ridge`, `couloir`, `linkup`, etc., it knows the standard out-and-back conditions don't apply and adjusts the prompt accordingly.
+- If nothing matches and the name is unfamiliar, it does **not** give up — it's instructed to run Colorado-specific searches and decode descriptive nicknames (e.g. "infinity loop" = the Elbert–Massive figure-eight) before, as a last resort, asking one short clarifying question.
+
+**2. Building the prompt.**
+The engine assembles a system prompt that injects: the resolved route context, learned source-reliability weights, learned verdict thresholds, any per-route learned bias, a dated seasonal baseline (e.g. "2026 is a low snow year"), and any **community field reports** previously submitted for this route via the correction modal. This is what makes two people asking about the same route get answers informed by what the crew has actually reported.
+
+**3. Live research via Claude + web search.**
+The prompt goes to the Claude API (`claude-sonnet-4-6` by default) with the **web search tool** enabled (up to 12 searches). Claude runs the workflow itself — searching SNOTEL, 14ers.com trip reports, AllTrails snippets, NWS/mountain-forecast at summit elevation, and CDOT — then weighs what it finds.
+
+**4. Reasoning rules baked into the prompt.**
+The engine enforces how evidence is weighed:
+- **Dated trip reports beat generic boilerplate.** A specific "May 16: dry, didn't use traction" report overrides an undated "early season may require spikes" seasonal blurb. The bot won't hedge a dry route down because of catch-all warnings, and won't invent hazards no recent report mentions.
+- **Calibrated, not timid.** Good recent evidence → SENDABLE, stated plainly. Caution is reserved for genuinely thin/conflicting data or real hazards.
+- **Common-sense fallback, never fabrication.** If a live source (e.g. SNOTEL) fails, it reasons from known context (the seasonal baseline, recent reports) and says so — it never invents numbers, and never asserts anything that contradicts data already in hand.
+- **Route-match tagging.** Every report it uses is tagged ON_ROUTE / PARTIAL / WRONG_ROUTE; a "perfect conditions" report for the wrong route can't drive the verdict.
+
+**5. Structured verdict back.**
+Claude returns a JSON object: a four-tier verdict (`SENDABLE` / `LIKELY` / `MARGINAL` / `NOT_YET`), a confidence score, a one-line TL;DR, data-age, named hazards, and the per-source findings. The engine parses the last text block (robust to interim tool-use commentary) and falls back to a graceful MARGINAL if the response is malformed rather than crashing.
+
+**6. Display + safety net (`index.js`).**
+The bot renders a compact Discord embed: TL;DR headline, the verdict with color/emoji, side-by-side snow/weather, recent reports, hazards, a day pick, and a one-line "not a safety call — check CAIC" footer. A light code-level net only downgrades a SENDABLE if the model itself reported *no real data* **and** was very unconfident — a confident SENDABLE on good data always stands.
+
+**7. Feedback → tuning (`tuner.js`).**
+The 👍/👎 buttons and the "report actual conditions" modal feed the self-healing loop (next section), which adjusts source weights, verdict thresholds, and per-route bias over time.
+
+### Architecture at a glance
+
+```
+Discord /sendable
+      │
+      ▼
+ index.js ──── resolves route ──► db.js (routes/peaks, learned params, field notes)
+      │
+      ▼
+ beta-engine.js ─ builds prompt (route ctx + learned weights + baseline + field notes)
+      │
+      ▼
+ Claude API + web_search ─ SNOTEL · 14ers · AllTrails · weather · CDOT
+      │
+      ▼
+ structured JSON verdict ──► compact Discord embed (TL;DR + 4-tier rating)
+      │
+      ▼
+ 👍/👎 + "report conditions" ──► tuner.js ──► updates learned params in db.js
+```
 
 ---
 
@@ -38,20 +93,18 @@ It runs the same multi-source conditions workflow we built as the `co-mountain-b
 ### The `/sendable` embed
 
 ```
-✅ Quandary Peak — SENDABLE
-[2-3 sentence verdict, framed as conditions not safety clearance]
-🕐 Data recency:  most recent on-route report: … (N days ago)
-⚠️ Hazards:  avalanche / cornices / postholing / lightning …
-❄️ Snowpack:  …
-📋 Trip reports:  … (flagged ON_ROUTE or WRONG_ROUTE)
-🥾 AllTrails:  …
-🌤️ Weather (Sat):  … + turnaround time
+✅ Mount Princeton — SENDABLE
+TL;DR — Dry and runnable now; standard East Slopes is in summer shape.
+❄️ Snow / pack:  …          🌤️ Weather (Sat):  … + turnaround
+📋 Recent reports:  May 16 "dry, didn't use traction" (ON_ROUTE)
+⚠️ Watch for:  afternoon storms above treeline
 📅 Day pick:  …
-🛟 This is not a safety clearance:  … check CAIC, verify yourself
 🔗 Sources: [1][2][3]
-Confidence 78% · 👍 0 👎 0 · vote + report conditions to tune me
+78% confidence · most recent report 9 days ago · not a safety call — check CAIC · 👍0 👎0
 [👍] [👎] [Report actual conditions]
 ```
+
+The verdict uses a **four-tier scale**: ✅ SENDABLE (recent evidence shows good conditions) · 🟢 LIKELY GOOD (looks good, evidence slightly less direct/fresh) · ⚠️ MARGINAL (genuinely mixed) · ❌ NOT YET (clear signs it's not in). A bold **TL;DR** leads every card; fuller detail collapses into a "📖 More" field only when there's more to say.
 
 ### Route precision
 
@@ -105,7 +158,7 @@ npm start
 
 1. Push this folder to a GitHub repo.
 2. Railway → New Project → Deploy from GitHub repo.
-3. **Variables**: add `DISCORD_TOKEN`, `CLIENT_ID`, `ANTHROPIC_API_KEY`, and `DATABASE_PATH=/data/sendable.db`.
+3. **Variables**: add `DISCORD_TOKEN`, `CLIENT_ID`, `ANTHROPIC_API_KEY`, `DATABASE_PATH=/data/sendable.db`, and **`NIXPACKS_NODE_VERSION=20`**. The Node version variable is important — `better-sqlite3` has no prebuilt binary for the newest Node and will fail the build trying to compile from source (missing Python). Pinning Node 20 avoids this.
 4. **Volume**: add a volume mounted at `/data` so the learned model + feedback survive redeploys. *(Without this, the bot still works but forgets what it learned on every deploy.)*
 5. After first deploy, run the command registration once. Either:
    - locally: `CLIENT_ID=… DISCORD_TOKEN=… npm run register`, or
