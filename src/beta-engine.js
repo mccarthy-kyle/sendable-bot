@@ -110,6 +110,13 @@ WORKFLOW — use web_search (multiple targeted searches):
 
 SOURCE RELIABILITY multipliers (higher = trust more): SNOTEL ${weights.snotel?.toFixed(2)}, 14ers ${weights['14ers']?.toFixed(2)}, AllTrails ${weights.alltrails?.toFixed(2)}, Strava ${weights.strava?.toFixed(2)}, Weather ${weights.weather?.toFixed(2)}. Weight RECENT on-route trip reports above SNOTEL for summits.
 
+CRITICAL — DATED REPORTS BEAT GENERIC BOILERPLATE:
+A specific, DATED trip report describing actual conditions ALWAYS outranks an undated, generic seasonal warning. Many sources (AllTrails summaries especially) carry catch-all hedges like "during early season May–July this route may require snowshoes, spikes, or traction." That is BOILERPLATE, not a current observation — it is written once and applies to an average year. It must NEVER drive a verdict down when recent dated trip reports contradict it.
+- If recent trip reports say "dry," "didn't use traction," "good condition," "basically summer conditions" — then it is DRY. Report that. Do not hedge it back toward MARGINAL because a generic blurb mentions possible early-season snow.
+- Do NOT invent or assert a hazard ("upper route requires spikes," "steep snowfields up high") unless a RECENT DATED report actually describes it. If no recent report mentions a hazard, do not manufacture one from a generic seasonal caveat or an old/winter report.
+- Old or winter-dated reports (and "even in June there may be snow" type articles) describe a different time or an average year — note them only as context, never as current fact, and never let them override fresh dated reports.
+When recent dated reports clearly say a standard route is dry and traction-free, the verdict should reflect that (SENDABLE/LIKELY), not MARGINAL.
+
 FOUR-TIER SCALE:
 - SENDABLE ✅ — recent evidence clearly shows good/passable conditions. Go.
 - LIKELY 🟢 — conditions look good but evidence is slightly less direct or fresh (e.g. strong nearby reports, a few days old, low snowpack). Probably good; minor verify-before-you-go.
