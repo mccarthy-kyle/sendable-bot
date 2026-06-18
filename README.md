@@ -96,6 +96,7 @@ Discord /sendable
 ✅ Mount Princeton — SENDABLE
 TL;DR — Dry and runnable now; standard East Slopes is in summer shape.
 ❄️ Snow / pack:  …          🌤️ Weather (Sat):  … + turnaround
+📊 vs past years:  SWE 3.1in now vs 5.4/6.0in in 2024/2023 — both melted out by now
 📋 Recent reports:  May 16 "dry, didn't use traction" (ON_ROUTE)
 ⚠️ Watch for:  consequential hazards only (steep snow, self-arrest, exposure, lightning)
 🎯 Suggested kit:  traction / safety / layers / other — only shown when real hazards exist
