@@ -24,6 +24,31 @@ migrate();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
+// Truncate to a clean word boundary with an ellipsis, so fields never cut mid-word.
+function clip(text, max) {
+  if (!text) return '—';
+  const t = String(text).trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[,;:.\s]+$/, '') + '…';
+}
+
+// Build the gear-kit embed field, grouped by category. Returns [] when there's
+// no kit (clean day) so the field is omitted entirely.
+function buildGearField(kit) {
+  if (!kit || typeof kit !== 'object') return [];
+  const order = ['traction', 'safety', 'layers', 'other'];
+  const icons = { traction: '🥾 Traction', safety: '🪢 Safety', layers: '🧥 Layers', other: '🎒 Other' };
+  const lines = [];
+  for (const cat of order) {
+    const v = kit[cat];
+    if (v && String(v).trim()) lines.push(`**${icons[cat]}:** ${String(v).trim()}`);
+  }
+  if (lines.length === 0) return [];
+  return [{ name: '🎯 Suggested kit', value: clip(lines.join('\n'), 600) }];
+}
+
 const VERDICT_META = {
   SENDABLE:  { color: 0x4ade80, emoji: '✅', label: 'SENDABLE' },
   LIKELY:    { color: 0x84cc16, emoji: '🟢', label: 'LIKELY GOOD' },
@@ -71,7 +96,8 @@ function buildEmbed(routeName, targetDate, beta, queryId, tally) {
         ? [{ name: '📊 vs past years', value: beta.historical_analog.slice(0, 250) }]
         : []),
       { name: '📋 Recent reports', value: (beta.trip_reports || '—').slice(0, 250) },
-      { name: '⚠️ Watch for', value: (beta.hazards || 'Assess avalanche, snow, exposure & weather yourself.').slice(0, 250) },
+      { name: '⚠️ Watch for', value: clip(beta.hazards || 'Assess avalanche, snow, exposure & weather yourself.', 240) },
+      ...buildGearField(beta.gear_kit),
       { name: '📅 Day pick', value: (beta.day_recommendation || '—').slice(0, 200) },
     )
     .setFooter({

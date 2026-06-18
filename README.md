@@ -97,7 +97,8 @@ Discord /sendable
 TL;DR — Dry and runnable now; standard East Slopes is in summer shape.
 ❄️ Snow / pack:  …          🌤️ Weather (Sat):  … + turnaround
 📋 Recent reports:  May 16 "dry, didn't use traction" (ON_ROUTE)
-⚠️ Watch for:  afternoon storms above treeline
+⚠️ Watch for:  consequential hazards only (steep snow, self-arrest, exposure, lightning)
+🎯 Suggested kit:  traction / safety / layers / other — only shown when real hazards exist
 📅 Day pick:  …
 🔗 Sources: [1][2][3]
 78% confidence · most recent report 9 days ago · not a safety call — check CAIC · 👍0 👎0
