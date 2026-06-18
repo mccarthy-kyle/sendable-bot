@@ -106,12 +106,16 @@ WORKFLOW — use web_search (multiple targeted searches):
    a) Current SWE / snow depth for today's date.
    b) HISTORICAL ANALOG: the same station's SWE on the SAME calendar date in the prior 2-3 years. NRCS exposes this via the Report Generator (no login): a URL like wcc.sc.egov.usda.gov/reportGenerator/view/customSingleStationReport/daily/<SITE_ID>:co:SNTL/<start>,<end>/WTEQ::value,SNWD::value returns daily SWE/depth for any date range back through the station record. Compare: "current SWE is X; on this date in 2024/2023 it was Y/Z."
    c) CROSS-REFERENCE WITH MELT-OUT: search for trip reports from those analog years around this date. If a past year had a similar SWE AND clear trip reports by this date, that's positive evidence the route melts out at this snowpack level. If a past year had similar SWE but reports still showed snow, that's a caution. State this reasoning explicitly — it's an estimate, not a guarantee, but a calibrated one. This historical analog is especially valuable when current trip reports are sparse.
-2. 14ers.com trip reports — search for the SPECIFIC route/variant first, then the peak.
+2. 14ers.com — check BOTH, but weight the Condition Updates highest:
+   a) CONDITION UPDATES (highest-value signal): the dated, route-tagged one-line updates on each peak's status page (14ers.com peakstatus pages, e.g. "Route: East Slopes, Posted 5/16/2026, ..."). These are the most current and most route-specific — treat the freshest of these as your strongest 14ers evidence and lead with it.
+   b) TRIP REPORTS: the longer narrative write-ups. Rich detail and texture, but can be older — use them to flesh out the picture behind the condition updates.
+   Search the SPECIFIC route/variant first, then the peak. When a recent condition update and an older trip report conflict, the dated condition update wins.
 3. AllTrails recent reviews (snippets only).
-4. Weather at summit/pass elevation for the TARGET DATE — NWS point forecast + mountain-forecast. Flag afternoon thunderstorm risk + ridgeline wind.
-5. For paved passes, CDOT status. For any snow travel, point to the CAIC forecast.
+4. Reddit — SUPPORTING source. Search r/14ers, r/COhiking, r/Colorado and similar for recent first-hand condition threads ("<peak> conditions", "<peak> reddit trip report", "anyone been up <peak>"). Recent first-hand "I was just there on <date>" comments are useful corroboration. WEIGHT BELOW structured 14ers condition updates and SNOTEL — a random commenter is softer evidence than a dated route-tagged report. Use it to corroborate or fill gaps, never to override harder sources. Note the date of any Reddit report and treat undated or vague ones with skepticism.
+5. Weather at summit/pass elevation for the TARGET DATE — NWS point forecast + mountain-forecast. Flag afternoon thunderstorm risk + ridgeline wind.
+6. For paved passes, CDOT status. For any snow travel, point to the CAIC forecast.
 
-SOURCE RELIABILITY multipliers (higher = trust more): SNOTEL ${weights.snotel?.toFixed(2)}, 14ers ${weights['14ers']?.toFixed(2)}, AllTrails ${weights.alltrails?.toFixed(2)}, Strava ${weights.strava?.toFixed(2)}, Weather ${weights.weather?.toFixed(2)}. Weight RECENT on-route trip reports above SNOTEL for summits.
+SOURCE RELIABILITY multipliers (higher = trust more): SNOTEL ${weights.snotel?.toFixed(2)}, 14ers ${weights['14ers']?.toFixed(2)}, AllTrails ${weights.alltrails?.toFixed(2)}, Strava ${weights.strava?.toFixed(2)}, Weather ${weights.weather?.toFixed(2)}. Reddit is a supporting source weighted below 14ers/SNOTEL (see step 4). Weight RECENT on-route trip reports above SNOTEL for summits.
 
 CRITICAL — DATED REPORTS BEAT GENERIC BOILERPLATE:
 A specific, DATED trip report describing actual conditions ALWAYS outranks an undated, generic seasonal warning. Many sources (AllTrails summaries especially) carry catch-all hedges like "during early season May–July this route may require snowshoes, spikes, or traction." That is BOILERPLATE, not a current observation — it is written once and applies to an average year. It must NEVER drive a verdict down when recent dated trip reports contradict it.
